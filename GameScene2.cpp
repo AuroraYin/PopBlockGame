@@ -20,6 +20,8 @@ bool GameScene_2::init()
 		return false;
 	}
 	iCurrent = 2;
+
+	
 	auto rootNode = CSLoader::createNode("GameScene2.csb");
 
 	root = (Layout*)rootNode->getChildByName("root");

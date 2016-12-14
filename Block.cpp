@@ -39,7 +39,7 @@ void Block::blockInit(int type, int x, int y)//(x,y)为方块在数组中的位置(0,0)->(
 		block = Sprite::create("bomb.png");
 		break;
 	}
-	block->setPosition(370 + 60 * x, 670);
+	//block->setPosition(370 + 60 * x, 670);
 }
 
 void Block::blockDelete()
@@ -48,6 +48,7 @@ void Block::blockDelete()
 	this->block->setTexture("block0.png");
 	this->block->setPosition(Vec2(30, 610));
 }
+
 void Block::moveTo(int x, int y)
 {
 	auto* move = MoveTo::create(0.1, Vec2(370 + 60 * x, 50 + 60 * y));

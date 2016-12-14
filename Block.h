@@ -15,4 +15,11 @@ public:
 	void blockInit(int type, int x, int y);               //初始化方块
 	void moveTo(int x, int y);                            //方块移动
 };
+
+class Gift : public Block {};
+
+class Bomb : public Block {};
+
+class Stone : public Block {};
+
 #endif
