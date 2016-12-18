@@ -47,8 +47,9 @@ bool GameScene_2::init()
 	addChild(scoreLabel);
 	//////////////////////////////////////////////////////////////////
 
-	addMap();
-	addBlock();
+	state = new StateLevel2();
+	gameSpace = new GameSpace(state);
+	this->addBlock();
 
 	auto listener = EventListenerTouchOneByOne::create();
 	// 绑定监听事件
@@ -74,24 +75,6 @@ void GameScene_2::ComeBack(cocos2d::Ref*pSender, Widget::TouchEventType type)
 	}
 }
 
-void GameScene_2::addMap()
-{
-	iScore = 0;
-	srand(unsigned(time(0)));
-	for (int x = 0; x < 10; x++)
-	{
-		for (int y = 0; y < 10; y++)
-		{
-			map1[x][y] = rand() % 6 + 1;
-			srand(rand()*rand());//更新随机数种子
-			map2[x][y] = 10 * y + x;
-			record[x][y] = -1;
-		}
-	}
-	map1[2][6] = 7;
-	map1[4][5] = 7;
-	map1[8][9] = 7;
-}
 
 void GameScene_2::addBlock()
 {
@@ -99,13 +82,14 @@ void GameScene_2::addBlock()
 	{
 		for (int y = 0; y < 10; y++)
 		{
-			blocks[x][y] = new Block(map1[x][y], x, y);
-			this->addChild(blocks[x][y]->block);
-			auto move = MoveTo::create((640 - blocks[x][y]->posY * 60) / 200.0, Vec2(370 + 60 * blocks[x][y]->posX, 50 + 60 * blocks[x][y]->posY));
-			blocks[x][y]->block->runAction(move);
+			gameSpace->blocks[x][y] = new Block(gameSpace->map[x][y]->iType, x, y);
+			this->addChild(gameSpace->blocks[x][y]->block);
+			gameSpace->blocks[x][y]->block->setPosition(370 + 60 * x, 670);
+			auto move = MoveTo::create((640 - gameSpace->blocks[x][y]->posY * 60) / 200.0,
+				Vec2(370 + 60 * gameSpace->blocks[x][y]->posX, 50 + 60 * gameSpace->blocks[x][y]->posY));
+			gameSpace->blocks[x][y]->block->runAction(move);
 		}
 	}
-	NumOfBlocks = 0;
 }
 
 bool GameScene_2::onTouchBegan(Touch* touch, Event* event)
@@ -118,50 +102,50 @@ bool GameScene_2::onTouchBegan(Touch* touch, Event* event)
 		int x = (int)(position.x - 340) / 60;
 		int y = (int)(position.y - 20) / 60;
 		
-		int posx = map2[x][y] % 10;
-		int posy = map2[x][y] / 10;
+		int posx = gameSpace->map[x][y]->iIndexNum % 10;
+		int posy = gameSpace->map[x][y]->iIndexNum / 10;
 
-		if (map2[x][y]>=0&&blocks[posx][posy]->type == 7)
+		if (gameSpace->map[x][y]->iIndexNum>=0&&gameSpace->map[posx][posy]->iType == 7)
 		{
-			iScore += 200;
-			map1[x][y] = 0;
-			map2[x][y] = -1;
-			sprintf(score_str, "%d", iScore);
-			blocks[posx][posy]->blockDelete();
+			gameSpace->iScore += 200;
+			gameSpace->map[x][y]->iType = 0;
+			gameSpace->map[x][y]->iIndexNum = -1;
+			sprintf(score_str, "%d", gameSpace->iScore);
+			gameSpace->blocks[posx][posy]->blockDelete();
 			scoreLabel->setString(score_str);
-			this->blockDrop();
-			this->moveLeft();
+			gameSpace->blockDrop();
+			gameSpace->moveLeft();
 		}
-		if (canDelete(x, y) == true)
+		if (gameSpace->canDelete(x, y) == true)
 		{
 			SimpleAudioEngine::getInstance()->playEffect("res/music/pop.mp3");
-			UDLRDelete(x, y);
+			gameSpace->UDLRDelete(x, y);
 			//后续操作：
-			iScore += NumOfBlocks*NumOfBlocks * 10;
-			CCLOG("%d", iScore);
-			this->blockDrop();
-			this->moveLeft();
-			this->cleanRecord();
-			NumOfBlocks = 0;
+			gameSpace->iScore += gameSpace->iNumOfBlocks*gameSpace->iNumOfBlocks * 10;
+			//CCLOG("%d", iScore);
+			gameSpace->blockDrop();
+			gameSpace->moveLeft();
+			gameSpace->cleanRecord();
+			gameSpace->iNumOfBlocks = 0;
 
 			auto userdefault = UserDefault::getInstance();
 
-			sprintf(score_str, "%d", iScore);
+			sprintf(score_str, "%d", gameSpace->iScore);
 
 			scoreLabel->setString(score_str);
 
 
-			if (isOver() == true)
+			if (gameSpace->isOver() == true)
 			{
-				if (iScore >= 3000)
+				if (gameSpace->iScore >= 3000)
 				{
-					Clear();
+					gameSpace->Clear();
 					auto layer = YouwinLayer::create();
 					this->addChild(layer);
 				}
 				else
 				{
-					Clear();
+					gameSpace->Clear();
 					auto layer = GameOverLayer::create();
 					this->addChild(layer);
 				}
@@ -172,182 +156,6 @@ bool GameScene_2::onTouchBegan(Touch* touch, Event* event)
 	return false;
 }
 
-bool GameScene_2::canDelete(int x, int y)
-{
-	int type = map1[x][y];
-	bool isadd = false;
-	if (map1[x][y] <6&&map1[x][y]>0)
-	{
-		if (y + 1 < 10 && map1[x][y + 1] == type&&record[x][y + 1] == -1)//上方存在未检测过的同色方块
-		{
-			//Up
-			isadd = true;
-		}
-		if (y > 0 && map1[x][y - 1] == type&&record[x][y - 1] == -1)
-		{
-			//Down
-			isadd = true;
-		}
-		if (x > 0 && map1[x - 1][y] == type&&record[x - 1][y] == -1)
-		{
-			//Left
-			isadd = true;
-		}
-		if (x + 1 < 10 && map1[x + 1][y] == type&&record[x + 1][y] == -1)
-		{
-			//Right
-			isadd = true;
-		}
-		if (isadd == true)
-		{
-			record[x][y] = 0;
-			NumOfBlocks++;
-			map1[x][y] = 0;
-			CurrentType = type;
-			return true;
-		}
-		else return false;
-	}
-	else return false;
-}
-
-void GameScene_2::UDLRDelete(int x, int y)
-{
-	int posx = map2[x][y] % 10;
-	int posy = map2[x][y] / 10;
-	blocks[posx][posy]->blockDelete();//直接消除对应的方块
-	map2[x][y] = -1;
-	//依次计算对应点的上下左右相邻的星星
-	if (y + 1 < 10 && map1[x][y + 1] == CurrentType&&record[x][y + 1] == -1)//上方存在未检测过的同色方块
-	{
-		//Up
-		record[x][y + 1] = 0;
-		map1[x][y + 1] = 0;
-		NumOfBlocks++;
-		UDLRDelete(x, y + 1);
-	}
-	if (y > 0 && map1[x][y - 1] == CurrentType&&record[x][y - 1] == -1)
-	{
-		//Down
-		record[x][y - 1] = 0;
-		map1[x][y - 1] = 0;
-		NumOfBlocks++;
-		UDLRDelete(x, y - 1);
-	}
-	if (x > 0 && map1[x - 1][y] == CurrentType&&record[x - 1][y] == -1)
-	{
-		//Left
-		record[x - 1][y] = 0;
-		map1[x - 1][y] = 0;
-		NumOfBlocks++;
-		UDLRDelete(x - 1, y);
-	}
-	if (x + 1 < 10 && map1[x + 1][y] == CurrentType&&record[x + 1][y] == -1)
-	{
-		//Right
-		record[x + 1][y] = 0;
-		map1[x + 1][y] = 0;
-		NumOfBlocks++;
-		UDLRDelete(x + 1, y);
-	}
-}
-
-void GameScene_2::blockDrop()
-{
-	for (int y = 1; y < 10; y++)
-	{
-		for (int x = 0; x < 10; x++)
-		{
-			// 遍历每一个非最底层的星星，看其下方是否存在空白
-
-			if (map1[x][y]>0)//有方块，需要检测其是否能够向下移动
-			{
-				for (int i = 0; i < y; i++)
-				{
-					if (map1[x][i] == 0)//有空位
-					{
-						int posx = map2[x][y] % 10;
-						int posy = map2[x][y] / 10;
-						map1[x][i] = map1[x][y];
-						map1[x][y] = 0;
-						map2[x][i] = map2[x][y];
-						map2[x][y] = -1;
-						blocks[posx][posy]->moveTo(x, i);
-						break;
-					}
-				}
-			}
-		}
-	}
-}
-
-void GameScene_2::moveLeft()
-{
-	for (int x = 1; x < 10; x++)
-	{
-		if (map1[x][0] >0)
-		{
-			for (int i = 0; i < x; i++)
-			{
-				if (map1[i][0] == 0)
-				{
-					for (int y = 0; y < 10; y++)
-					{
-						if (map1[x][y]>0)
-						{
-							int posx = map2[x][y] % 10;
-							int posy = map2[x][y] / 10;
-							map1[i][y] = map1[x][y];
-							map1[x][y] = 0;
-							map2[i][y] = map2[x][y];
-							map2[x][y] = -1;
-							blocks[posx][posy]->moveTo(i, y);
-						}
-					}
-					break;
-				}
-			}
-
-		}
-	}
-}
-
-void GameScene_2::cleanRecord()
-{
-	for (int x = 0; x < 10; x++)
-	{
-		for (int y = 0; y < 10; y++)
-			record[x][y] = -1;
-	}
-}
-
-
-bool GameScene_2::isOver()
-{
-	bool result = true;
-	for (int x = 0; x < 9; x++)
-	{
-		for (int y = 0; y < 9; y++)
-		{
-			if ((map1[x][y] != 0) && map1[x + 1][y] == map1[x][y]&&map1[x][y]!=6)
-				result = false;
-			if (map1[x][y] != 0 && map1[x][y] == map1[x][y + 1]&&map1[x][y]!=6)
-				result = false;
-		}
-	}
-	return result;
-}
-
-void GameScene_2::Clear()
-{
-	for (int i = 0; i < 10; i++)
-	{
-		for (int j = 0; j < 10; j++)
-		{
-			blocks[i][j]->block->removeFromParent();
-		}
-	}
-}
 
 void GameScene_2::MusicControling(cocos2d::Ref*pSender, Widget::TouchEventType type)
 {

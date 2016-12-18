@@ -41,7 +41,8 @@ private:
 	Label* scoreLabel0;	
 	Button*UndoButton;
 	Button*RedoButton;
-
+	BaseCommandManager*commandManagerForGame;
+	BaseCommandManager*commandManagerForScore;
 };
 
 #endif // __GameScene_1_SCENE_H__

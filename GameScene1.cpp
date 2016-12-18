@@ -19,19 +19,22 @@ bool GameScene_1::init()
 	{
 		return false;
 	}
-	iCurrent = 1;
-
+	
+	//界面显示，控件定义
 	auto rootNode = CSLoader::createNode("GameScene1.csb");
-
 	root3 = (Layout*)rootNode->getChildByName("root3");
 	MusicControl1 = (cocos2d::ui::ImageView*)Helper::seekWidgetByName(root3, "Image_2");
 	ComeBackToBeginScene = (cocos2d::ui::Button*)Helper::seekWidgetByName(root3, "Button_8");
-	
+	UndoButton = (cocos2d::ui::Button*)Helper::seekWidgetByName(root3, "UndoButton");
+	RedoButton = (cocos2d::ui::Button*)Helper::seekWidgetByName(root3, "RedoButton");
+
 	MusicControl1->loadTexture("res/menu_sound_on.png");
 	MusicControl1->setTouchEnabled(true);
 	MusicControl1->addTouchEventListener(CC_CALLBACK_2(GameScene_1::MusicControl, this));
 
 	ComeBackToBeginScene->addTouchEventListener(CC_CALLBACK_2(GameScene_1::ComeBack, this));
+	UndoButton->addTouchEventListener(CC_CALLBACK_2(GameScene_1::Undo, this));
+	RedoButton->addTouchEventListener(CC_CALLBACK_2(GameScene_1::Redo, this));
 	addChild(rootNode);
 
 	scoreLabel0 = Label::createWithTTF("Score:", "fonts/Marker Felt.ttf", 36);
@@ -45,6 +48,8 @@ bool GameScene_1::init()
 	addChild(scoreLabel);
 	//////////////////////////////////////////////////////////////////
 	
+	commandManagerForGame = new CommandManager();
+	commandManagerForScore = new CommandManager();
 	state = new StateLevel1();
 	gameSpace = new GameSpace(state);
 	this->addBlock();
@@ -99,6 +104,14 @@ bool GameScene_1::onTouchBegan(Touch* touch, Event* event)
 		//将坐标转换为对应在blocks数组的索引
 		int x = (int)(position.x - 340) / 60;
 		int y = (int)(position.y - 20) / 60;
+		GameCommand*commandCurrent = new GameCommand(gameSpace);
+		ScoreCommand*scoreCurrent = new ScoreCommand(gameSpace->iScore);
+		commandManagerForGame->CallCommand(commandCurrent);
+		commandManagerForScore->CallCommand(scoreCurrent);
+		commandManagerForGame->ClearAllCommands();
+		commandManagerForScore->ClearAllCommands();
+
+
 		if (gameSpace->canDelete(x, y) == true)
 		{
 			SimpleAudioEngine::getInstance()->playEffect("res/music/pop.mp3");
@@ -117,7 +130,6 @@ bool GameScene_1::onTouchBegan(Touch* touch, Event* event)
 			
 			scoreLabel->setString(score_str);
 			
-
 			if (gameSpace->isOver() == true)
 			{
 				if (gameSpace->iScore >= 3000)
@@ -158,6 +170,109 @@ void GameScene_1::MusicControl(cocos2d::Ref*pSender, Widget::TouchEventType type
 			iMusic = 1;
 			MusicControl1->loadTexture("menu_sound_on.png");
 			SimpleAudioEngine::getInstance()->resumeBackgroundMusic();
+		}
+		break;
+	}
+}
+
+void GameScene_1::Undo(cocos2d::Ref * pSender, Widget::TouchEventType type)
+{
+	switch (type)
+	{
+	case Widget::TouchEventType::ENDED:
+
+		GameCommand*commandCurrent = new GameCommand(gameSpace);
+		ScoreCommand*scoreCurrent = new ScoreCommand(gameSpace->iScore);
+		
+		int*commandOfGame = nullptr;
+		int*commandOfScore = nullptr;
+		bool bRes1 = commandManagerForGame->Undo(commandOfGame,commandCurrent);
+		bool bRes2 = commandManagerForScore->Undo(commandOfScore,scoreCurrent);
+		if (bRes1&&bRes2)
+		{
+			gameSpace->Clear();
+			gameSpace->cleanRecord();
+			sprintf(score_str, "%d", *commandOfScore);
+			scoreLabel->setString(score_str);
+
+			for (int x = 0; x < 10; x++)
+			{
+				for (int y = 0; y < 10; y++)
+				{
+					gameSpace->iScore = *commandOfScore;
+					int index = x + 10 * y;
+					gameSpace->map[x][y]->iType = commandOfGame[index];
+					gameSpace->blocks[x][y] = new Block(commandOfGame[index], x, y);
+					if (commandOfGame[index] > 0) {
+						gameSpace->blocks[x][y]->block->setPosition(370 + 60 * gameSpace->blocks[x][y]->posX,
+							50 + 60 * gameSpace->blocks[x][y]->posY);
+						gameSpace->map[x][y]->iIndexNum = index;
+						this->addChild(gameSpace->blocks[x][y]->block);
+						auto move = MoveTo::create(0.01, gameSpace->blocks[x][y]->block->getPosition());
+						gameSpace->blocks[x][y]->block->runAction(move);
+					}
+					else
+					{
+						//gameSpace->blocks[x][y]->block->setPosition(1000, 700);
+						//this->addChild(gameSpace->blocks[x][y]->block);
+						gameSpace->map[x][y]->iIndexNum = -1;
+					}
+				}
+			}
+		}
+		else {
+			//无法Undo
+		}
+		break;
+	}
+}
+
+void GameScene_1::Redo(cocos2d::Ref * pSender, Widget::TouchEventType type)
+{
+	switch (type)
+	{
+	case Widget::TouchEventType::ENDED:
+		GameCommand*commandCurrent = new GameCommand(gameSpace);
+		ScoreCommand*scoreCurrent = new ScoreCommand(gameSpace->iScore);
+
+		int*commandOfGame = nullptr;
+		int*commandOfScore = nullptr;
+		bool bRes1 = commandManagerForGame->Redo(commandOfGame,commandCurrent);
+		bool bRes2 = commandManagerForScore->Redo(commandOfScore,scoreCurrent);
+		if (bRes1&&bRes2)
+		{
+			gameSpace->Clear();
+			gameSpace->cleanRecord();
+			sprintf(score_str, "%d", *commandOfScore);
+			scoreLabel->setString(score_str);
+
+			for (int x = 0; x < 10; x++)
+			{
+				for (int y = 0; y < 10; y++)
+				{
+					gameSpace->iScore = *commandOfScore;
+					int index = x + 10 * y;
+					gameSpace->map[x][y]->iType = commandOfGame[index];
+					gameSpace->blocks[x][y] = new Block(commandOfGame[index], x, y);
+					if (commandOfGame[index] > 0) {
+						gameSpace->blocks[x][y]->block->setPosition(370 + 60 * gameSpace->blocks[x][y]->posX,
+							50 + 60 * gameSpace->blocks[x][y]->posY);
+						gameSpace->map[x][y]->iIndexNum = index;
+						this->addChild(gameSpace->blocks[x][y]->block);
+						auto move = MoveTo::create(0.01, gameSpace->blocks[x][y]->block->getPosition());
+						gameSpace->blocks[x][y]->block->runAction(move);
+					}
+					else
+					{
+						//gameSpace->blocks[x][y]->block->setPosition(1000, 700);
+						//this->addChild(gameSpace->blocks[x][y]->block);
+						gameSpace->map[x][y]->iIndexNum = -1;
+					}
+				}
+			}
+		}
+		else {
+			//无法Redo
 		}
 		break;
 	}

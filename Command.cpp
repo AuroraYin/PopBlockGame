@@ -1,5 +1,10 @@
 #include"Command.h"
 
-int* Command::Execute() {
+int* GameCommand::Execute() {
 	return intCommand;
 }
+
+int* GameCommand::Unexecute() {
+	return intCommand;
+}
+

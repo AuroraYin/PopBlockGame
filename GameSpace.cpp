@@ -23,7 +23,7 @@ bool GameSpace::canDelete(int x, int y)
 {
 	int type = map[x][y]->iType;
 	bool isadd = false;
-	if (map[x][y]->iType != 0)
+	if (map[x][y]->iType > 0 && map[x][y]->iType < 6)
 	{
 		if (y + 1 < 10 && map[x][y + 1]->iType == type&&map[x][y + 1]->iRecord == -1)//上方存在未检测过的同色方块
 		{
@@ -191,6 +191,7 @@ void GameSpace::Clear()
 	{
 		for (int j = 0; j < 10; j++)
 		{
+			if(map[i][j]->iType>0)
 			blocks[i][j]->block->removeFromParent();
 		}
 	}
